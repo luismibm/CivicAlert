@@ -1,6 +1,7 @@
 package com.luismibm.civicalert.ui.home
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -13,6 +14,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.luismibm.civicalert.databinding.FragmentHomeBinding
 
 class HomeFragment : Fragment() {
@@ -21,6 +24,7 @@ class HomeFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var locationPermissionRequest: ActivityResultLauncher<Array<String>>
+    private lateinit var mFusedLocationClient: FusedLocationProviderClient
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -38,8 +42,9 @@ class HomeFragment : Fragment() {
             textView.text = it
         }
 
-        locationPermissionRequest = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            result ->
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
+
+        locationPermissionRequest = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
             val fineLocationGranted = result.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false)
             val coarseLocationGranted = result.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)
             if (fineLocationGranted) {
@@ -52,10 +57,11 @@ class HomeFragment : Fragment() {
         }
 
         binding.buttonLocation.setOnClickListener { getLocation() }
-
         return root
+
     }
 
+    @SuppressLint("DefaultLocale", "SetTextI18n")
     private fun getLocation() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(requireContext(), "Request Permissions", Toast.LENGTH_SHORT).show()
@@ -65,8 +71,21 @@ class HomeFragment : Fragment() {
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             )
-        } else {
-            Toast.makeText(requireContext(), "getLocation() Permissions Granted", Toast.LENGTH_SHORT).show()
+        }
+        mFusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                val mLastLocation = location
+                binding.textHome.setText(
+                    String.format(
+                        "Latitude: %1$.4f \n Longitude: %2$.4f \n Date: Not Available",
+                        mLastLocation.latitude,
+                        mLastLocation.longitude,
+                        mLastLocation.time
+                    )
+                )
+            } else {
+                binding.textHome.setText("No Location Known")
+            }
         }
     }
 
@@ -74,4 +93,5 @@ class HomeFragment : Fragment() {
         super.onDestroyView()
         _binding = null
     }
+
 }

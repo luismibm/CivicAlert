@@ -3,7 +3,13 @@ package com.luismibm.civicalert.ui.home
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.location.Address
+import android.location.Geocoder
+import android.location.Location
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,6 +23,9 @@ import androidx.lifecycle.ViewModelProvider
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.luismibm.civicalert.databinding.FragmentHomeBinding
+import java.io.IOException
+import java.util.Locale
+import java.util.concurrent.Executors
 
 class HomeFragment : Fragment() {
 
@@ -74,17 +83,50 @@ class HomeFragment : Fragment() {
         }
         mFusedLocationClient.lastLocation.addOnSuccessListener { location ->
             if (location != null) {
-                val mLastLocation = location
-                binding.textHome.setText(
-                    String.format(
-                        "Latitude: %1$.4f \n Longitude: %2$.4f \n Date: Not Available",
-                        mLastLocation.latitude,
-                        mLastLocation.longitude,
-                        mLastLocation.time
-                    )
-                )
+                fetchAdress(location)
             } else {
                 binding.textHome.setText("No Location Known")
+            }
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun fetchAdress(location: Location) {
+        val executor = Executors.newSingleThreadExecutor()
+        val handler = Handler(Looper.getMainLooper())
+        val geocoder = Geocoder(requireContext(), Locale.getDefault())
+        executor.execute {
+            var addresses: List<Address>? = null
+            var resultMessage = ""
+            try {
+                addresses = geocoder.getFromLocation(
+                    location.latitude,
+                    location.longitude,
+                    1
+                )
+                if (addresses == null || addresses.size == 0) {
+                    if (resultMessage.isEmpty()) {
+                        resultMessage = "No Address Found"
+                    }
+                } else {
+
+                    val address= addresses[0]
+                    val addressParts: ArrayList<String> = ArrayList()
+                    for (i in 0..address.maxAddressLineIndex) {
+                        addressParts.add(address.getAddressLine(i))
+                    }
+                    resultMessage = TextUtils.join("\n", addressParts)
+                    var finalResultMessage = resultMessage
+
+                    handler.post {
+                        val time = java.text.DateFormat.getTimeInstance().format(System.currentTimeMillis())
+                        binding.textHome.text = "Location: $finalResultMessage \n Time: $time"
+                    }
+                }
+            } catch (e: IOException) {
+                resultMessage = "fetchAddress() IOException"
+            } catch (e: IllegalArgumentException) {
+                resultMessage = "fetchAddress() illegalArgumentException"
             }
         }
     }
